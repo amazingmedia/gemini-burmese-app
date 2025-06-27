@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini AI Speech-to-Text (မြန်မာ)</title>
+    <style>
+        body { font-family: 'Padauk', 'Myanmar Text', sans-serif; display: flex; justify-content: center; align-items: center; flex-direction: column; min-height: 100vh; background-color: #f0f2f5; margin: 0; color: #333; }
+        h1 { color: #444; }
+        #container { width: 90%; max-width: 700px; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
+        #recordButton { background-color: #4285F4; color: white; padding: 15px 30px; border: none; border-radius: 50px; font-size: 1em; cursor: pointer; transition: background-color 0.3s, transform 0.1s; display: flex; align-items: center; justify-content: center; margin: 20px auto; width: 200px; }
+        #recordButton:hover { background-color: #357ae8; }
+        #recordButton.recording { background-color: #DB4437; }
+        #recordButton.recording:hover { background-color: #c23321; }
+        #status { margin-top: 15px; font-size: 1em; color: #666; min-height: 24px; font-weight: bold; }
+        #result { width: 100%; min-height: 150px; border: 1px solid #ccc; border-radius: 5px; padding: 10px; margin-top: 20px; font-size: 1.1em; text-align: left; box-sizing: border-box; background-color: #fafafa; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Gemini AI Speech-to-Text</h1>
+        <p>ခလုတ်ကိုနှိပ်၍ မြန်မာလို စတင်ပြောဆိုပါ</p>
+        <button id="recordButton">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white" style="margin-right: 8px;"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+            <span>စတင်ပြောရန်</span>
+        </button>
+        <div id="status"></div>
+        <div id="result" contenteditable="true" placeholder="ပြောဆိုပြီးသော စာသားများ ဤနေရာတွင် ပေါ်လာပါမည်..."></div>
+    </div>
+    <script>
+        const recordButton = document.getElementById('recordButton');
+        const statusDiv = document.getElementById('status');
+        const resultDiv = document.getElementById('result');
+        const buttonText = recordButton.querySelector('span');
+        let isRecording = false;
+        let mediaRecorder;
+        let audioChunks = [];
+        recordButton.addEventListener('click', async () => {
+            if (isRecording) {
+                mediaRecorder.stop();
+            } else {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    isRecording = true;
+                    recordButton.classList.add('recording');
+                    buttonText.textContent = 'ရပ်ရန်';
+                    statusDiv.textContent = 'နားထောင်နေပါသည်...';
+                    audioChunks = [];
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
+                    mediaRecorder.ondataavailable = event => { audioChunks.push(event.data); };
+                    mediaRecorder.onstop = sendAudioToServer;
+                } catch (err) {
+                    console.error('Error accessing microphone:', err);
+                    statusDiv.textContent = 'မိုက်ခရိုဖုန်းကို အသုံးပြုခွင့်မရပါ။';
+                }
+            }
+        });
+        async function sendAudioToServer() {
+            isRecording = false;
+            recordButton.classList.remove('recording');
+            buttonText.textContent = 'စတင်ပြောရန်';
+            statusDiv.textContent = 'Processing... ကျေးဇူးပြု၍ ခေတ္တစောင့်ပါ';
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+            try {
+                const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Transcription failed on server.');
+                }
+                const data = await response.json();
+                resultDiv.textContent = data.transcript;
+                statusDiv.textContent = 'Transcription အောင်မြင်ပါသည်!';
+            } catch (err) {
+                console.error('Error sending audio:', err);
+                statusDiv.textContent = `Error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
